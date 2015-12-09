@@ -37,7 +37,7 @@ int create_client_socket() {
     }
     while (1) {
         if (recvfrom(socket_desc, buf, 512, 0, (struct sockaddr*)&serv, &slen) > 0) {
-            printf("Received packet from %s:%d\nData: %s\n\n",
+            printf("Received packet from %s:%d\nData: %x\n\n",
                 inet_ntoa(serv.sin_addr), ntohs(serv.sin_port), buf);
             if (echo == 1){
                 if ((sendto(socket_desc, buf, 512, 0, (struct sockaddr*)&serv, slen)) < 0) {

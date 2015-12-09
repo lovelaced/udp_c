@@ -5,8 +5,8 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
-//#include <sys/uio.h>
-
+#include <unistd.h>
+#define MSECS 1000000
 //int create_udp_socket(char* hostname, int port);
 
 int opt = 0;
@@ -17,6 +17,7 @@ int num = 0;
 int seq = 0;
 int length = 0;
 int echo = 0;
+long ratems = 0;
 
 
 int hostname_to_ip(char* hostname, char* ip) {
@@ -51,10 +52,23 @@ int send_packet(int socket_desc, struct sockaddr_in serv_addr) {
         }
         printf("seq_no: %d, first 4 bytes of payload: ", i);
         for (int i = 0; i < 4; i++) {
-            printf("%x", data[i]);
+            printf("%x\n", data[i]);
         }
-        puts("");
-        sleep(rate);
+        printf("sending every %ld ms\n", ratems);
+        if (echo == 1) {
+            char buf[512];
+            int echo_addr = sizeof(serv_addr);
+            if (recvfrom(socket_desc, buf, 512, 0, (struct sockaddr *)&serv_addr, &echo_addr) < 0) {
+                perror("recv");
+            }
+            buf[512] = '\0';
+            puts("echo:");
+            printf("seq_no: %d, first 4 bytes of payload: ", i);
+            for (int i = 0; i < 4; i++) {
+                printf("%x\n", data[i]);
+            }
+        }
+        usleep(ratems);
     }
     return 0;
 }
@@ -155,6 +169,8 @@ int main (int argc, char *argv[]) {
         puts("Invalid number of arguments");
         exit(1);
     }
+
+    ratems = (long)MSECS / (long)rate;
     create_udp_socket();
 
 }
