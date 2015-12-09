@@ -8,3 +8,6 @@ blaster: blaster.c
 
 blastee: blastee.c
 	gcc -o blastee blastee.c
+
+clean:
+	rm blaster blastee
