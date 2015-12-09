@@ -48,13 +48,6 @@ int create_client_socket() {
             }   
         } else { perror("recv"); }
     }
-    if (echo == 1){
-        if ((sendto(socket_desc, buf, 512, 0, (struct sockaddr*)&serv, slen)) < 0) {
-            perror("sendto");
-            return 1;
-        }
-        puts("echoing");
-    }
     close(socket_desc);
     return 0;
 }
