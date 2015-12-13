@@ -35,11 +35,22 @@ int create_client_socket() {
         perror("bind");
         exit(1);
     }
+	int seq; uint len;
     while (1) {
         if (recvfrom(socket_desc, buf, 512, 0, (struct sockaddr*)&serv, &slen) > 0) {
-            printf("Received packet from %s:%d\nData: %x\n\n",
-                inet_ntoa(serv.sin_addr), ntohs(serv.sin_port), buf);
+			memcpy(&seq, buf+1, sizeof(int));
+			memcpy(&len, buf+5, sizeof(uint));
+			seq = htonl(seq);
+			len = htonl(len);
+            printf("Received packet from %s:%d\n Type: %c, seq: %d, len: %u\n Data: %hhx%hhx%hhx%hhx\n\n",
+                inet_ntoa(serv.sin_addr), ntohs(serv.sin_port),
+				buf[0], seq, len,
+				buf[9],buf[10],buf[11],buf[12]);
+			int j = 0;
+			while(buf[j])
+			{printf("%02x",buf[j++]);}
             if (echo == 1){
+				buf[0]='C';
                 if ((sendto(socket_desc, buf, 512, 0, (struct sockaddr*)&serv, slen)) < 0) {
                 perror("sendto");
                 return 1;

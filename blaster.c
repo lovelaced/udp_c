@@ -15,7 +15,7 @@ int port = 0;
 int rate = 0;
 int num = 0;
 int seq = 0;
-int length = 0;
+unsigned int length = 0;
 int echo = 0;
 long ratems = 0;
 
@@ -40,20 +40,30 @@ int hostname_to_ip(char* hostname, char* ip) {
 
 int send_packet(int socket_desc, struct sockaddr_in serv_addr) {
 
-    char data[length];
-   // char* data = "test";
-
+    char data[length+9];//type-seq-len-data
+	memset(data, 0xaa, sizeof(data));
+	uint len = htonl(length);
+	int sq;
+	memcpy(data+5, &len, sizeof(int));
     printf("sending %d bytes to socket %d, %s:%d\n", sizeof(data), socket_desc,
             inet_ntoa(serv_addr.sin_addr), ntohs(serv_addr.sin_port));
-    for (int i = seq; i < seq+num; i++) {
+    for (int i = 0; i < num; i++) {
+		if(i==num-1) data[0] = 'E';
+		else data[0] = 'D';
+		sq = htonl(seq);
+		memcpy(data+1, &sq, sizeof(int));
         if (sendto(socket_desc, data, sizeof(data), 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
         perror("sendto");
         return 1;
         }
-        printf("seq_no: %d, first 4 bytes of payload: ", i);
-        for (int i = 0; i < 4; i++) {
-            printf("%x\n", data[i]);
+		printf("sizeof(data)=%d\n", sizeof(data));
+        printf("type: %c,seq_no: %d, len: %u, first 4 bytes of payload:\n", data[0], data[1], data[5]);
+		printf("%hhx %hhx %hhx %hhx %hhx %hhx %hhx %hhx %hhx",
+				data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],data[8]);
+        for (int j = 9; j < 14; j++) {
+            printf("%hhx\n", data[j]);
         }
+		seq+= length;
         printf("sending every %ld ms\n", ratems);
         if (echo == 1) {
             char buf[512];
@@ -62,12 +72,12 @@ int send_packet(int socket_desc, struct sockaddr_in serv_addr) {
                 perror("recv");
             }
             buf[512] = '\0';
+			int seqe; uint lene;
+			memcpy(&seqe, buf+1, sizeof(int));
+			memcpy(&lene, buf+5, sizeof(uint));
             puts("echo:");
-            printf("seq_no: %d, first 4 bytes of payload: ", i);
-            for (int i = 0; i < 4; i++) {
-                printf("%x\n", data[i]);
-            }
-        }
+            printf("type: %c, seq: %d, len: %u, Data:%hhx%hhx%hhx%hhx\n", buf[0], ntohl(seqe), ntohl(lene), buf[9], buf[10], buf[11], buf[12]);
+		}
         usleep(ratems);
     }
     return 0;
