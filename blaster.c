@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -18,7 +19,9 @@ int seq = 0;
 unsigned int length = 0;
 int echo = 0;
 long ratems = 0;
-
+struct sock {
+	struct sockaddr_in addr;
+	int desc;};
 
 int hostname_to_ip(char* hostname, char* ip) {
     struct hostent *he;
@@ -38,9 +41,24 @@ int hostname_to_ip(char* hostname, char* ip) {
     return 1;
 }
 
+void * echoer (void * arg) {
+	struct sock *s = arg;
+	for(int i = 0; i < length; i++){
+	char buf[50009];
+	int echo_addr = sizeof(s->addr);
+	if (recvfrom(s->desc, buf, 50009, 0, (struct sockaddr *)&s->addr, &echo_addr) < 0) {
+		perror("recv");
+	}
+	buf[50009] = '\0';
+	int seqe; 
+	memcpy(&seqe, buf+1, sizeof(int));
+
+	printf("echo %d\nData:%hhx%hhx%hhx%hhx\n", ntohl(seqe), buf[9], buf[10], buf[11], buf[12]);
+	}
+}
 int send_packet(int socket_desc, struct sockaddr_in serv_addr) {
 
-    char data[length+9];//type-seq-len-data
+	char data[length+9];//type-seq-len-data
 	memset(data, 0xaa, sizeof(data));
 	uint len = htonl(length);
 	int sq;
@@ -56,28 +74,13 @@ int send_packet(int socket_desc, struct sockaddr_in serv_addr) {
         perror("sendto");
         return 1;
         }
-		printf("sizeof(data)=%d\n", sizeof(data));
-        printf("type: %c,seq_no: %d, len: %u, first 4 bytes of payload:\n", data[0], data[1], data[5]);
-		printf("%hhx %hhx %hhx %hhx %hhx %hhx %hhx %hhx %hhx",
-				data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],data[8]);
+        printf("%d\n",ntohl(sq));
         for (int j = 9; j < 14; j++) {
-            printf("%hhx\n", data[j]);
+            printf("%hhx", data[j]);
         }
+		puts("");
 		seq+= length;
-        printf("sending every %ld ms\n", ratems);
-        if (echo == 1) {
-            char buf[512];
-            int echo_addr = sizeof(serv_addr);
-            if (recvfrom(socket_desc, buf, 512, 0, (struct sockaddr *)&serv_addr, &echo_addr) < 0) {
-                perror("recv");
-            }
-            buf[512] = '\0';
-			int seqe; uint lene;
-			memcpy(&seqe, buf+1, sizeof(int));
-			memcpy(&lene, buf+5, sizeof(uint));
-            puts("echo:");
-            printf("type: %c, seq: %d, len: %u, Data:%hhx%hhx%hhx%hhx\n", buf[0], ntohl(seqe), ntohl(lene), buf[9], buf[10], buf[11], buf[12]);
-		}
+
         usleep(ratems);
     }
     return 0;
@@ -88,7 +91,7 @@ int create_udp_socket() {
     struct sockaddr_in serv_addr;
 
     if ((socket_desc = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        puts("Your socket failed, kill yourself");
+        puts("Your socket failed");
         exit(1);
     }
     
@@ -99,6 +102,13 @@ int create_udp_socket() {
     serv_addr.sin_family = AF_INET;
     inet_aton(ip, &serv_addr.sin_addr);
     serv_addr.sin_port = htons(port);
+	if(echo) { 
+		struct sock s;
+		s.addr = serv_addr;
+		s.desc = socket_desc;
+		pthread_t thrd;
+		pthread_create(&thrd, NULL, echoer, &s);
+	}
 
     send_packet(socket_desc, serv_addr);
 

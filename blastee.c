@@ -1,8 +1,9 @@
 #include <stdio.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/time.h>
+#include <time.h>
 #include <unistd.h>
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -18,14 +19,20 @@ int echo = 0;
 int create_client_socket() {
     struct sockaddr_in client, serv;
     int slen=sizeof(serv);
-    char buf[512];
+    char buf[50009];
     int socket_desc;
-
+	struct timeval tv;
+	struct timeval start;
+	struct tm* t;
+	int total_packets =0; int total_bytes =0;
+	gettimeofday(&start, NULL);
     if ((socket_desc = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         puts("Your socket failed, kill yourself");
         exit(1);
     }
-
+	struct timeval to;
+	to.tv_sec = 5;
+	setsockopt(socket_desc, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
     memset((char*)&client, 0, sizeof(client));
 
     client.sin_family = AF_INET;
@@ -36,29 +43,39 @@ int create_client_socket() {
         exit(1);
     }
 	int seq; uint len;
-    while (1) {
-        if (recvfrom(socket_desc, buf, 512, 0, (struct sockaddr*)&serv, &slen) > 0) {
+	char type = 'D';
+    while (type!='E') {
+        if (recvfrom(socket_desc, buf, 50009, 0, (struct sockaddr*)&serv, &slen) > 0) {
+			type = buf[0];
 			memcpy(&seq, buf+1, sizeof(int));
 			memcpy(&len, buf+5, sizeof(uint));
 			seq = htonl(seq);
 			len = htonl(len);
-            printf("Received packet from %s:%d\n Type: %c, seq: %d, len: %u\n Data: %hhx%hhx%hhx%hhx\n\n",
+			gettimeofday(&tv, NULL);
+			t = localtime(&tv.tv_sec);
+            printf("Received packet from %s:%d\n at %d:%d:%d.%d Type: %c, seq: %d, len: %u\n Data: %hhx%hhx%hhx%hhx\n",
                 inet_ntoa(serv.sin_addr), ntohs(serv.sin_port),
-				buf[0], seq, len,
+				t->tm_hour, t->tm_min, t->tm_sec, tv.tv_usec / 1000,
+				type, seq, len,
 				buf[9],buf[10],buf[11],buf[12]);
-			int j = 0;
-			while(buf[j])
-			{printf("%02x",buf[j++]);}
+			total_packets++;
+			total_bytes += len;
             if (echo == 1){
 				buf[0]='C';
-                if ((sendto(socket_desc, buf, 512, 0, (struct sockaddr*)&serv, slen)) < 0) {
+                if ((sendto(socket_desc, buf, 50009, 0, (struct sockaddr*)&serv, slen)) < 0) {
                 perror("sendto");
                 return 1;
                 }   
-            puts("echoing");
+				puts("echoing");
             }   
-        } else { perror("recv"); }
+        } else { perror("recv"); break;}
     }
+	float duration; 
+	struct timeval end;
+	gettimeofday(&end, NULL);
+	duration = (end.tv_sec - start.tv_sec);
+	duration +=(end.tv_usec - start.tv_usec)/1000000;
+	printf("Total packets: %d, Total bytes: %d, avg. packets/s %f, avg. bytes/s %f, duration %f\n",total_packets, total_bytes, total_packets/duration, total_bytes/duration, duration);
     close(socket_desc);
     return 0;
 }
