@@ -42,13 +42,13 @@ int create_client_socket() {
         perror("bind");
         exit(1);
     }
-	int seq; uint len;
+	int seq; unsigned int len;
 	char type = 'D';
     while (type!='E') {
         if (recvfrom(socket_desc, buf, 50009, 0, (struct sockaddr*)&serv, &slen) > 0) {
 			type = buf[0];
 			memcpy(&seq, buf+1, sizeof(int));
-			memcpy(&len, buf+5, sizeof(uint));
+			memcpy(&len, buf+5, sizeof(unsigned int));
 			seq = htonl(seq);
 			len = htonl(len);
 			gettimeofday(&tv, NULL);

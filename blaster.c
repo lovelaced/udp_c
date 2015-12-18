@@ -43,7 +43,7 @@ int hostname_to_ip(char* hostname, char* ip) {
 
 void * echoer (void * arg) {
 	struct sock *s = arg;
-	for(int i = 0; i < length; i++){
+	for(int i = 0; i < num; i++){
 	char buf[50009];
 	int echo_addr = sizeof(s->addr);
 	if (recvfrom(s->desc, buf, 50009, 0, (struct sockaddr *)&s->addr, &echo_addr) < 0) {
@@ -60,7 +60,7 @@ int send_packet(int socket_desc, struct sockaddr_in serv_addr) {
 
 	char data[length+9];//type-seq-len-data
 	memset(data, 0xaa, sizeof(data));
-	uint len = htonl(length);
+	unsigned int len = htonl(length);
 	int sq;
 	memcpy(data+5, &len, sizeof(int));
     printf("sending %d bytes to socket %d, %s:%d\n", sizeof(data), socket_desc,
